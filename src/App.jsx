@@ -30,7 +30,19 @@ function App() {
   });
 
   const [copySuccess, setCopySuccess] = useState(false);
-  const isAgent = window.location.search.includes('view=agent');
+  
+  // --- MAGIC LINK DETECTION ---
+  const searchParams = new URLSearchParams(window.location.search);
+  const isAgent = searchParams.get('view') === 'agent';
+  const agentUid = searchParams.get('uid'); // The ID of the Landlord
+
+  // --- INITIAL LOAD (Handle Agent View) ---
+  useEffect(() => {
+    if (isAgent && agentUid) {
+      // If it's an agent link, load the specific Landlord's data immediately
+      fetchUserData(agentUid);
+    }
+  }, [isAgent, agentUid]);
 
   // --- AUTH ---
   const handleAuth = async (e) => {
@@ -68,12 +80,14 @@ function App() {
       setProperties(data.properties);
       setRooms(data.rooms);
       setBookings(data.bookings);
+      
+      // Auto-select first property
       if (data.properties.length > 0) {
         setActivePropertyId(data.properties[0].id);
         const firstPropRooms = data.rooms.filter(r => r.propertyId === data.properties[0].id);
         if (firstPropRooms.length > 0) setActiveRoomId(firstPropRooms[0].id);
-      } else {
-        setModalType('property');
+      } else if (!isAgent) {
+        setModalType('property'); // Prompt landlord to create one
       }
     } finally { setLoading(false); }
   };
@@ -89,13 +103,14 @@ function App() {
     }
   }, [activePropertyId, activePropertyRooms]);
 
-  // --- ACTIONS (Keeping same logic, just hiding specific functions for brevity) ---
+  // --- ACTIONS ---
+  
   const handleCopyLink = () => {
-    const link = `${window.location.origin}/?view=agent`;
+    // UPDATED: Now includes the Landlord's ID in the link
+    const link = `${window.location.origin}/?view=agent&uid=${user.id}`;
     navigator.clipboard.writeText(link).then(() => { setCopySuccess(true); setTimeout(() => setCopySuccess(false), 2000); });
   };
   
-  // Reusing same handlers from before
   const handleSaveBlock = async (e) => {
     e.preventDefault();
     if (!forms.manual.pin) return alert("Enter PIN");
@@ -130,13 +145,13 @@ function App() {
   const calendarDays = eachDayOfInterval({ start: startOfWeek(startOfMonth(currentDate)), end: endOfWeek(endOfMonth(startOfMonth(currentDate))) });
   const getBookingForDay = (day) => { if (!activeRoomId) return null; return bookings.find(booking => { if (booking.roomId !== activeRoomId) return false; const start = typeof booking.start === 'string' ? parseISO(booking.start.substring(0, 10)) : new Date(booking.start); const end = typeof booking.end === 'string' ? parseISO(booking.end.substring(0, 10)) : new Date(booking.end); return isWithinInterval(day, { start, end }); }); };
 
-  // --- RENDER: BOLD LOGIN SCREEN ---
+  // --- RENDER: LOGIN SCREEN ---
   if (!user && !isAgent) {
     return (
       <div className="login-wrapper">
         <div className="login-card">
           <div className="brand-header">
-            <Calendar size={40} strokeWidth={2.5} />
+            <Calendar size={40} strokeWidth={2.5} color="#ff385c" />
             <span className="brand-name">SyncStay</span>
           </div>
           
@@ -206,8 +221,10 @@ function App() {
           ) : (
             <div style={{ padding: '60px', textAlign: 'center', border: '2px dashed #ddd', borderRadius: '12px' }}>
               <Building size={48} color="#ddd" style={{marginBottom:'20px'}}/>
-              <h3>No Properties Yet</h3>
-              <p style={{marginBottom:'20px', color:'#777'}}>Create your first building to start managing.</p>
+              <h3>No Properties Found</h3>
+              <p style={{marginBottom:'20px', color:'#777'}}>
+                {isAgent ? "This link might be invalid or has no properties." : "Create your first building to start managing."}
+              </p>
               {!isAgent && <button className="btn-primary" style={{margin:'0 auto'}} onClick={() => setModalType('property')}>+ Create Property</button>}
             </div>
           )}
@@ -246,7 +263,7 @@ function App() {
           {!isAgent && (
             <div className="sidebar-card">
               <h3 className="card-title">Share Calendar</h3>
-              <div className="link-box">{window.location.host}/?view=agent</div>
+              <div className="link-box">{window.location.host}/?view=agent&uid={user?.id}</div>
               <button className="btn-outline" style={{ width: '100%', justifyContent: 'center', borderColor: copySuccess ? 'green' : '#dddddd', color: copySuccess ? 'green' : 'inherit' }} onClick={handleCopyLink}>
                 {copySuccess ? <Check size={16} /> : <Copy size={16} />} {copySuccess ? ' Copied!' : ' Copy Link'}
               </button>
