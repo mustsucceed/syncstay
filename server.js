@@ -5,28 +5,58 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- DATA STORAGE ---
+// --- DATABASE ---
 let db = {
-  properties: [
-    { id: 1, name: "Blue Water Duplex", location: "Lekki Phase 1", pin: "1234" }
-  ],
-  rooms: [
-    { id: 101, propertyId: 1, name: "Whole Apartment", price: "₦200,000" }
-  ],
-  bookings: [
-    { id: 999, roomId: 101, start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString(), source: 'manual', label: 'Demo' }
-  ]
+  users: [], // Stores { id, username, password }
+  properties: [],
+  rooms: [],
+  bookings: []
 };
 
-// --- GET ---
-app.get('/api/data', (req, res) => {
-  res.json(db);
+// --- AUTH ENDPOINTS ---
+app.post('/api/signup', (req, res) => {
+  const { username, password } = req.body;
+  if (db.users.find(u => u.username === username)) {
+    return res.status(400).json({ error: "User already exists" });
+  }
+  const newUser = { id: Date.now(), username, password };
+  db.users.push(newUser);
+  res.json({ success: true, user: newUser });
 });
 
-// --- POST (Create) ---
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  const user = db.users.find(u => u.username === username && u.password === password);
+  
+  if (user) {
+    res.json({ success: true, user });
+  } else {
+    res.status(401).json({ error: "Invalid credentials" });
+  }
+});
+
+// --- DATA ENDPOINTS (Now Filtered by User) ---
+app.get('/api/data', (req, res) => {
+  const userId = parseInt(req.query.userId); // Who is asking?
+  
+  // Filter: Only send data belonging to this user
+  const userProps = db.properties.filter(p => p.userId === userId);
+  const propIds = userProps.map(p => p.id);
+  const userRooms = db.rooms.filter(r => propIds.includes(r.propertyId));
+  const roomIds = userRooms.map(r => r.id);
+  const userBookings = db.bookings.filter(b => roomIds.includes(b.roomId));
+
+  res.json({
+    properties: userProps,
+    rooms: userRooms,
+    bookings: userBookings
+  });
+});
+
+// --- CREATE ENDPOINTS (Attach User ID) ---
 app.post('/api/properties', (req, res) => {
-  const newProp = req.body;
-  if (!newProp.pin) newProp.pin = "1234";
+  const { userId, ...propData } = req.body;
+  const newProp = { ...propData, userId }; 
   db.properties.push(newProp);
   res.json({ success: true });
 });
@@ -38,9 +68,11 @@ app.post('/api/rooms', (req, res) => {
 
 app.post('/api/bookings', (req, res) => {
   const { pin, ...bookingData } = req.body;
+  
+  // Verify PIN
   const room = db.rooms.find(r => r.id === parseInt(bookingData.roomId));
   if (!room) return res.status(404).json({ error: "Room not found" });
-
+  
   const property = db.properties.find(p => p.id === room.propertyId);
   if (property.pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
 
@@ -48,27 +80,15 @@ app.post('/api/bookings', (req, res) => {
   res.json({ success: true });
 });
 
-// --- NEW: DELETE PROPERTY ---
 app.delete('/api/properties/:id', (req, res) => {
   const { pin } = req.body;
   const id = parseInt(req.params.id);
-
   const propIndex = db.properties.findIndex(p => p.id === id);
-  if (propIndex === -1) return res.status(404).json({ error: "Not found" });
-
-  // CHECK PIN
-  if (db.properties[propIndex].pin !== pin) {
-    return res.status(401).json({ error: "Incorrect PIN" });
-  }
-
-  // DELETE
-  db.properties.splice(propIndex, 1);
   
-  // CLEANUP (Remove rooms and bookings for this property)
-  const roomIds = db.rooms.filter(r => r.propertyId === id).map(r => r.id);
-  db.rooms = db.rooms.filter(r => r.propertyId !== id);
-  db.bookings = db.bookings.filter(b => !roomIds.includes(b.roomId));
+  if (propIndex === -1) return res.status(404).json({ error: "Not found" });
+  if (db.properties[propIndex].pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
 
+  db.properties.splice(propIndex, 1);
   res.json({ success: true });
 });
 

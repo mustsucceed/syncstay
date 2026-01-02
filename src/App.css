@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
   --primary: #ff385c;
@@ -14,14 +14,168 @@
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
 html, body { width: 100%; overflow-x: hidden; font-size: 14px; background-color: #fff; color: var(--dark); }
 
-/* LAYOUT - WIDESCREEN FIX */
+/* --- LOGIN PAGE STYLES (NEW) --- */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc; /* Very light grey background */
+  padding: 20px;
+}
+
+.login-card {
+  background: white;
+  width: 100%;
+  max-width: 420px; /* Fixed width on desktop */
+  padding: 40px;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.08); /* Soft shadow */
+  text-align: center;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  color: var(--primary);
+}
+
+.brand-name {
+  font-size: 32px;
+  font-weight: 800; /* Extra Bold */
+  letter-spacing: -0.5px;
+  color: var(--primary);
+}
+
+.login-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--dark);
+}
+
+.login-subtitle {
+  color: var(--gray);
+  margin-bottom: 32px;
+  font-size: 14px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 16px;
+  margin-bottom: 16px;
+  background-color: #f8fafc;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.login-input:focus {
+  background-color: white;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(255, 56, 92, 0.1); /* Glow effect */
+}
+
+.login-btn {
+  width: 100%;
+  padding: 16px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+  margin-top: 8px;
+}
+.login-btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+
+.auth-switch {
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--gray);
+  cursor: pointer;
+  font-weight: 500;
+}
+.auth-switch:hover { color: var(--primary); text-decoration: underline; }
+
+
+/* ... keep your existing root variables ... */
+
+/* --- LOGIN CENTER FIX --- */
+.login-wrapper {
+  position: fixed;       /* Force it to stay on top of everything */
+  top: 0;
+  left: 0;
+  width: 100vw;          /* Full Viewport Width */
+  height: 100vh;         /* Full Viewport Height */
+  display: flex;         /* Use Flexbox */
+  align-items: center;   /* Center Vertically */
+  justify-content: center; /* Center Horizontally */
+  background-color: #f8fafc;
+  z-index: 1000;         /* Ensure it's above other elements */
+  padding: 20px;         /* Prevent edges touching on small phones */
+}
+
+.login-card {
+  background: white;
+  width: 100%;
+  max-width: 400px;      /* Perfect width for login box */
+  padding: 40px;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  text-align: center;    /* Center the text inside the card */
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp { 
+  from { transform: translateY(20px); opacity: 0; } 
+  to { transform: translateY(0); opacity: 1; } 
+}
+/* ... existing CSS ... */
+
+.login-input {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 16px;
+  margin-bottom: 16px;
+  
+  /* FORCE VISIBILITY */
+  background-color: #ffffff; /* White background */
+  color: #222222;            /* Black text */
+  
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+/* Ensure the placeholder text (e.g. "Username") is visible too */
+.login-input::placeholder {
+  color: #94a3b8; /* Medium Gray */
+}
+
+.login-input:focus {
+  background-color: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(255, 56, 92, 0.1);
+}
+
+
+/* --- MAIN APP LAYOUT --- */
 .container { 
-  max-width: 1800px; /* Full width for desktop */
+  max-width: 1800px; 
   margin: 0 auto; 
   padding: 0 40px; 
 }
 
-/* HEADER */
 .header { 
   display: flex; justify-content: space-between; align-items: center; 
   padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; 
@@ -32,97 +186,56 @@ html, body { width: 100%; overflow-x: hidden; font-size: 14px; background-color:
 
 .controls-area { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
-/* SELECTORS */
 .property-selector {
   padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
   font-size: 14px; font-weight: 600; color: var(--dark);
   background-color: white; cursor: pointer; min-width: 160px;
 }
 
-/* BUTTONS */
 .btn-primary { 
   background: var(--primary); color: white; border: none; padding: 10px 20px; 
   border-radius: 8px; font-weight: 600; cursor: pointer; 
-  display: flex; align-items: center; gap: 8px; font-size: 14px; transition: 0.2s; 
-  white-space: nowrap;
+  display: flex; align-items: center; gap: 8px; font-size: 14px; transition: 0.2s; white-space: nowrap;
 }
 .btn-primary:hover { background: var(--primary-hover); }
 
 .btn-outline { 
   background: white; color: var(--dark); border: 1px solid var(--border); 
   padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; 
-  display: flex; align-items: center; gap: 8px; font-size: 14px; transition: 0.2s; 
-  white-space: nowrap;
+  display: flex; align-items: center; gap: 8px; font-size: 14px; transition: 0.2s; white-space: nowrap;
 }
 .btn-outline:hover { background: var(--light-gray); border-color: var(--dark); }
 
-/* DASHBOARD GRID */
-.grid { 
-  display: grid; 
-  grid-template-columns: 1fr 380px; 
-  gap: 40px; 
-  align-items: start; 
-}
+.grid { display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: start; }
 
-/* CALENDAR STYLES */
+/* CALENDAR */
 .property-header { margin-bottom: 24px; }
 .property-title { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
 .property-meta { color: var(--gray); font-size: 15px; display: flex; gap: 20px; flex-wrap: wrap; }
 
-.calendar-container { 
-  border: 1px solid var(--border); border-radius: 16px; overflow: hidden; 
-  box-shadow: 0 6px 20px rgba(0,0,0,0.06); 
-}
-.month-header { 
-  background: white; padding: 20px; text-align: center; font-weight: 700; 
-  font-size: 18px; border-bottom: 1px solid var(--border); 
-  display: flex; justify-content: space-between; align-items: center; 
-}
-.nav-btn { 
-  background: none; border: 1px solid var(--border); border-radius: 50%; 
-  width: 36px; height: 36px; cursor: pointer; 
-  display: flex; align-items: center; justify-content: center; transition: 0.2s;
-}
+.calendar-container { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+.month-header { background: white; padding: 20px; text-align: center; font-weight: 700; font-size: 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.nav-btn { background: none; border: 1px solid var(--border); border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .nav-btn:hover { background: var(--light-gray); }
 
-.days-grid { 
-  display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; 
-  border-bottom: 1px solid var(--border); background: var(--light-gray); 
-}
-.day-label { 
-  padding: 12px 4px; font-size: 12px; font-weight: 600; 
-  color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;
-}
+.days-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; border-bottom: 1px solid var(--border); background: var(--light-gray); }
+.day-label { padding: 12px 4px; font-size: 12px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; }
 
 .dates-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: white; }
-.date-cell { 
-  min-height: 120px; 
-  border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); 
-  padding: 8px; position: relative; 
-}
+.date-cell { min-height: 120px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px; position: relative; }
 .date-number { font-size: 14px; font-weight: 500; margin-bottom: 6px; display: block; }
 .today { background-color: #fff0f3; }
 .today .date-number { color: var(--primary); font-weight: 700; }
 
-.booking-pill { 
-  font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-top: 4px; 
-  font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-}
+.booking-pill { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-top: 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .source-airbnb { background: #ffebeb; color: #c13515; }
 .source-booking { background: #ebf3ff; color: #003580; }
 .source-manual { background: #f0fdf4; color: #166534; }
 
 /* SIDEBAR */
-.sidebar-card { 
-  border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; 
-  background: white;
-}
+.sidebar-card { border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; background: white; }
 .card-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
-.link-box { 
-  background: var(--light-gray); padding: 12px; border-radius: 8px; 
-  font-size: 13px; color: var(--dark); word-break: break-all; 
-  margin-bottom: 12px; border: 1px solid var(--border); font-family: monospace; 
-}
+.link-box { background: var(--light-gray); padding: 12px; border-radius: 8px; font-size: 13px; color: var(--dark); word-break: break-all; margin-bottom: 12px; border: 1px solid var(--border); font-family: monospace; }
 
 /* MODAL */
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; backdrop-filter: blur(4px); }
@@ -143,22 +256,15 @@ html, body { width: 100%; overflow-x: hidden; font-size: 14px; background-color:
 .btn-cancel { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1; font-size: 15px; }
 .btn-submit { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1; font-size: 15px; }
 
-/* --- STRONG MOBILE RESPONSIVENESS --- */
+/* RESPONSIVENESS */
 @media screen and (max-width: 900px) {
   .container { width: 100%; padding: 15px; }
-  
   .header { flex-direction: column; align-items: flex-start; gap: 16px; }
   .controls-area { width: 100%; display: flex; flex-direction: column; gap: 10px; }
   .property-selector { width: 100%; }
-
-  /* Stack Grid Vertically */
   .grid { display: flex; flex-direction: column; gap: 30px; }
-
-  /* Calendar Fixes */
   .dates-grid .date-cell { min-height: 70px; padding: 4px; }
   .date-number { font-size: 12px; }
   .booking-pill { font-size: 9px; max-width: 100%; }
-
-  /* Modal Fixes */
-  .modal-content { width: 90%; margin: auto; max-height: 90vh; overflow-y: auto; padding: 20px; }
+  .modal-content { width: 90%; margin: auto; max-height: 90vh; overflow-y: auto; padding: 24px; }
 }
