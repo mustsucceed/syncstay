@@ -8,7 +8,6 @@ app.use(express.json());
 // --- DATA STORAGE ---
 let db = {
   properties: [
-    // Default property with a default PIN '1234'
     { id: 1, name: "Blue Water Duplex", location: "Lekki Phase 1", pin: "1234" }
   ],
   rooms: [
@@ -19,16 +18,15 @@ let db = {
   ]
 };
 
-// --- GET ENDPOINTS ---
+// --- GET ---
 app.get('/api/data', (req, res) => {
   res.json(db);
 });
 
-// --- POST ENDPOINTS ---
+// --- POST (Create) ---
 app.post('/api/properties', (req, res) => {
-  // Save the PIN when creating property
   const newProp = req.body;
-  if (!newProp.pin) newProp.pin = "1234"; // Default pin if none provided
+  if (!newProp.pin) newProp.pin = "1234";
   db.properties.push(newProp);
   res.json({ success: true });
 });
@@ -40,20 +38,37 @@ app.post('/api/rooms', (req, res) => {
 
 app.post('/api/bookings', (req, res) => {
   const { pin, ...bookingData } = req.body;
-  
-  // 1. FIND THE PROPERTY FOR THIS BOOKING
   const room = db.rooms.find(r => r.id === parseInt(bookingData.roomId));
   if (!room) return res.status(404).json({ error: "Room not found" });
 
   const property = db.properties.find(p => p.id === room.propertyId);
-  
-  // 2. CHECK THE PIN
-  if (property.pin !== pin) {
+  if (property.pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
+
+  db.bookings.push(bookingData);
+  res.json({ success: true });
+});
+
+// --- NEW: DELETE PROPERTY ---
+app.delete('/api/properties/:id', (req, res) => {
+  const { pin } = req.body;
+  const id = parseInt(req.params.id);
+
+  const propIndex = db.properties.findIndex(p => p.id === id);
+  if (propIndex === -1) return res.status(404).json({ error: "Not found" });
+
+  // CHECK PIN
+  if (db.properties[propIndex].pin !== pin) {
     return res.status(401).json({ error: "Incorrect PIN" });
   }
 
-  // 3. SAVE IF PIN IS CORRECT
-  db.bookings.push(bookingData);
+  // DELETE
+  db.properties.splice(propIndex, 1);
+  
+  // CLEANUP (Remove rooms and bookings for this property)
+  const roomIds = db.rooms.filter(r => r.propertyId === id).map(r => r.id);
+  db.rooms = db.rooms.filter(r => r.propertyId !== id);
+  db.bookings = db.bookings.filter(b => !roomIds.includes(b.roomId));
+
   res.json({ success: true });
 });
 

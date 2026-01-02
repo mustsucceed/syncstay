@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameMonth, isSameDay, addMonths, subMonths, isWithinInterval, parseISO } from 'date-fns';
-import { Calendar, Copy, Plus, ChevronLeft, ChevronRight, X, Building, BedDouble, Check, Loader2, Lock } from 'lucide-react';
+import { Calendar, Copy, Plus, ChevronLeft, ChevronRight, X, Building, BedDouble, Check, Loader2, Lock, Trash2 } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -18,9 +18,10 @@ function App() {
   // MODALS
   const [modalType, setModalType] = useState(null); 
   const [forms, setForms] = useState({
-    manual: { start: '', end: '', agent: '', pin: '' }, // Added PIN here
-    property: { name: '', location: '', pin: '' },      // Added PIN here
-    room: { name: '', price: '' }
+    manual: { start: '', end: '', agent: '', pin: '' },
+    property: { name: '', location: '', pin: '' },
+    room: { name: '', price: '' },
+    delete: { pin: '' } // New form for deletion
   });
 
   const [copySuccess, setCopySuccess] = useState(false);
@@ -68,10 +69,42 @@ function App() {
     });
   };
 
+  // --- NEW: DELETE PROPERTY ---
+  const handleDeleteProperty = async (e) => {
+    e.preventDefault();
+    if (!forms.delete.pin) return alert("Enter PIN to delete");
+
+    const response = await fetch(`https://syncstay.onrender.com/api/properties/${activePropertyId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: forms.delete.pin })
+    });
+
+    if (response.ok) {
+      // Remove from UI
+      const updatedProps = properties.filter(p => p.id !== activePropertyId);
+      setProperties(updatedProps);
+      
+      // Switch to another property if available
+      if (updatedProps.length > 0) {
+        setActivePropertyId(updatedProps[0].id);
+      } else {
+        setActivePropertyId(null);
+        setActiveRoomId(null);
+      }
+      
+      setModalType(null);
+      setForms({ ...forms, delete: { pin: '' } });
+      alert("Property Deleted.");
+    } else {
+      alert("Incorrect PIN. Cannot delete.");
+    }
+  };
+
   const handleSaveBlock = async (e) => {
     e.preventDefault();
     if (!forms.manual.start || !forms.manual.end) return alert("Select dates");
-    if (!forms.manual.pin) return alert("Enter Agent PIN"); // Force PIN
+    if (!forms.manual.pin) return alert("Enter Agent PIN");
 
     const newBooking = {
       id: Date.now(),
@@ -82,14 +115,11 @@ function App() {
       label: forms.manual.agent || (isAgent ? 'Agent Booking' : 'Manual Block')
     };
 
-    // SEND TO SERVER
     const response = await fetch('https://syncstay.onrender.com/api/bookings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newBooking, pin: forms.manual.pin }) // Send PIN to verify
+      body: JSON.stringify({ ...newBooking, pin: forms.manual.pin })
     });
-
-    const result = await response.json();
 
     if (response.ok) {
       setBookings([...bookings, newBooking]);
@@ -97,13 +127,13 @@ function App() {
       setForms({ ...forms, manual: { start: '', end: '', agent: '', pin: '' } });
       alert("Success! Dates blocked.");
     } else {
-      alert("Error: " + (result.error || "Wrong PIN"));
+      alert("Incorrect PIN");
     }
   };
 
   const handleSaveProperty = async (e) => {
     e.preventDefault();
-    if (!forms.property.pin) return alert("Set a PIN for this property");
+    if (!forms.property.pin) return alert("Set a PIN");
 
     const newProp = { id: Date.now(), name: forms.property.name, location: forms.property.location, pin: forms.property.pin };
     setProperties([...properties, newProp]);
@@ -159,6 +189,12 @@ function App() {
             <select className="property-selector" value={activePropertyId || ''} onChange={(e) => setActivePropertyId(parseInt(e.target.value))}>
               {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+            {/* DELETE BUTTON (Admin Only) */}
+            {!isAgent && properties.length > 0 && (
+               <button onClick={() => setModalType('delete')} style={{border:'none', background:'none', cursor:'pointer', color:'#ff385c', padding:'5px'}}>
+                 <Trash2 size={18} />
+               </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
@@ -234,11 +270,7 @@ function App() {
             <div className="sidebar-card">
               <h3 className="card-title">Share Calendar</h3>
               <div className="link-box">{window.location.host}/?view=agent</div>
-              <button 
-                className="btn-outline" 
-                style={{ width: '100%', justifyContent: 'center', borderColor: copySuccess ? 'green' : '#dddddd', color: copySuccess ? 'green' : 'inherit' }}
-                onClick={handleCopyLink}
-              >
+              <button className="btn-outline" style={{ width: '100%', justifyContent: 'center', borderColor: copySuccess ? 'green' : '#dddddd', color: copySuccess ? 'green' : 'inherit' }} onClick={handleCopyLink}>
                 {copySuccess ? <Check size={16} /> : <Copy size={16} />} {copySuccess ? ' Copied!' : ' Copy Link'}
               </button>
             </div>
@@ -250,23 +282,33 @@ function App() {
         <div className="modal-overlay" onClick={() => setModalType(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">Manage</h3>
+              <h3 className="modal-title">
+                 {modalType === 'delete' ? 'Confirm Deletion' : 'Manage'}
+              </h3>
               <button className="close-btn" onClick={() => setModalType(null)}><X size={20} /></button>
             </div>
+
+            {/* DELETE PROPERTY FORM */}
+            {modalType === 'delete' && (
+              <form onSubmit={handleDeleteProperty}>
+                <p style={{marginBottom:'15px', color:'red'}}>Warning: This will delete <strong>{activeProperty?.name}</strong> and all its bookings.</p>
+                <div className="form-group" style={{background: '#fff0f0', padding: '10px', borderRadius: '8px', border:'1px solid #fed7d7'}}>
+                  <label className="form-label" style={{color:'#c53030'}}>Enter PIN to Confirm</label>
+                  <input type="password" className="form-input" required placeholder="PIN" value={forms.delete.pin} onChange={e => setForms({...forms, delete: {pin: e.target.value}})} />
+                </div>
+                <button type="submit" className="btn-submit" style={{background:'#e53e3e'}}>Delete Forever</button>
+              </form>
+            )}
 
             {modalType === 'block' && (
               <form onSubmit={handleSaveBlock}>
                 <div className="form-group"><label className="form-label">Check-in</label><input type="date" className="form-input" required value={forms.manual.start} onChange={e => setForms({...forms, manual: {...forms.manual, start: e.target.value}})} /></div>
                 <div className="form-group"><label className="form-label">Check-out</label><input type="date" className="form-input" required value={forms.manual.end} onChange={e => setForms({...forms, manual: {...forms.manual, end: e.target.value}})} /></div>
                 <div className="form-group"><label className="form-label">Agent Name</label><input type="text" className="form-input" value={forms.manual.agent} placeholder="e.g. Booking from Agent" onChange={e => setForms({...forms, manual: {...forms.manual, agent: e.target.value}})} /></div>
-                
-                {/* PIN FIELD */}
                 <div className="form-group" style={{background: '#f8f8f8', padding: '10px', borderRadius: '8px'}}>
                   <label className="form-label">Security PIN <span style={{color:'red'}}>*</span></label>
                   <input type="password" className="form-input" required placeholder="Enter 4-digit PIN" value={forms.manual.pin} onChange={e => setForms({...forms, manual: {...forms.manual, pin: e.target.value}})} />
-                  <small style={{fontSize:'11px', color:'#777'}}>Ask property owner for PIN.</small>
                 </div>
-                
                 <button type="submit" className="btn-submit">Verify & Block</button>
               </form>
             )}
@@ -275,14 +317,10 @@ function App() {
               <form onSubmit={handleSaveProperty}>
                  <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-input" required value={forms.property.name} onChange={e => setForms({...forms, property: {...forms.property, name: e.target.value}})} /></div>
                  <div className="form-group"><label className="form-label">Location</label><input type="text" className="form-input" required value={forms.property.location} onChange={e => setForms({...forms, property: {...forms.property, location: e.target.value}})} /></div>
-                 
-                 {/* PIN CREATION */}
                  <div className="form-group" style={{background: '#eef2ff', padding: '10px', borderRadius: '8px', border:'1px solid #c7d2fe'}}>
                     <label className="form-label" style={{color: '#3730a3'}}>Create Booking PIN</label>
                     <input type="text" className="form-input" required placeholder="e.g. 1234" value={forms.property.pin} onChange={e => setForms({...forms, property: {...forms.property, pin: e.target.value}})} />
-                    <small style={{fontSize:'11px', color:'#3730a3'}}>Agents must use this to block dates.</small>
                  </div>
-
                  <button type="submit" className="btn-submit">Create Property</button>
               </form>
             )}
