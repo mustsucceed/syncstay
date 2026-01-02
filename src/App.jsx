@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameMonth, isSameDay, addMonths, subMonths, isWithinInterval, parseISO } from 'date-fns';
-import { Calendar, Copy, Plus, ChevronLeft, ChevronRight, X, Building, BedDouble, Check, Loader2 } from 'lucide-react';
+import { Calendar, Copy, Plus, ChevronLeft, ChevronRight, X, Building, BedDouble, Check, Loader2, Lock } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -15,11 +15,11 @@ function App() {
   const [activeRoomId, setActiveRoomId] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // MODALS & FORMS
+  // MODALS
   const [modalType, setModalType] = useState(null); 
   const [forms, setForms] = useState({
-    manual: { start: '', end: '', agent: '' },
-    property: { name: '', location: '' },
+    manual: { start: '', end: '', agent: '', pin: '' }, // Added PIN here
+    property: { name: '', location: '', pin: '' },      // Added PIN here
     room: { name: '', price: '' }
   });
 
@@ -38,15 +38,10 @@ function App() {
         setRooms(data.rooms);
         setBookings(data.bookings);
 
-        // Set Defaults if not set
         if (!activePropertyId && data.properties.length > 0) setActivePropertyId(data.properties[0].id);
         if (!activeRoomId && data.rooms.length > 0) setActiveRoomId(data.rooms[0].id);
 
-      } catch (error) { 
-        console.error("Fetch failed", error);
-      } finally { 
-        setLoading(false); 
-      }
+      } catch (error) { console.error("Fetch failed", error); } finally { setLoading(false); }
     };
     fetchAllData();
   }, []);
@@ -56,15 +51,12 @@ function App() {
   const activeRoom = rooms.find(r => r.id === parseInt(activeRoomId));
   const activeProperty = properties.find(p => p.id === parseInt(activePropertyId));
 
-  // Auto-select first room when property changes
   useEffect(() => {
     if (activePropertyId && activePropertyRooms.length > 0) {
-      // Only switch if current room doesn't belong to new property
       const currentRoomInProp = activePropertyRooms.find(r => r.id === activeRoomId);
       if (!currentRoomInProp) setActiveRoomId(activePropertyRooms[0].id);
     }
   }, [activePropertyId, activePropertyRooms]);
-
 
   // --- ACTIONS ---
 
@@ -79,7 +71,8 @@ function App() {
   const handleSaveBlock = async (e) => {
     e.preventDefault();
     if (!forms.manual.start || !forms.manual.end) return alert("Select dates");
-    
+    if (!forms.manual.pin) return alert("Enter Agent PIN"); // Force PIN
+
     const newBooking = {
       id: Date.now(),
       roomId: activeRoomId,
@@ -89,20 +82,30 @@ function App() {
       label: forms.manual.agent || (isAgent ? 'Agent Booking' : 'Manual Block')
     };
 
-    setBookings([...bookings, newBooking]);
-    setModalType(null);
-    setForms({ ...forms, manual: { start: '', end: '', agent: '' } });
-
-    await fetch('https://syncstay.onrender.com/api/bookings', {
+    // SEND TO SERVER
+    const response = await fetch('https://syncstay.onrender.com/api/bookings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newBooking)
+      body: JSON.stringify({ ...newBooking, pin: forms.manual.pin }) // Send PIN to verify
     });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      setBookings([...bookings, newBooking]);
+      setModalType(null);
+      setForms({ ...forms, manual: { start: '', end: '', agent: '', pin: '' } });
+      alert("Success! Dates blocked.");
+    } else {
+      alert("Error: " + (result.error || "Wrong PIN"));
+    }
   };
 
   const handleSaveProperty = async (e) => {
     e.preventDefault();
-    const newProp = { id: Date.now(), name: forms.property.name, location: forms.property.location };
+    if (!forms.property.pin) return alert("Set a PIN for this property");
+
+    const newProp = { id: Date.now(), name: forms.property.name, location: forms.property.location, pin: forms.property.pin };
     setProperties([...properties, newProp]);
     setActivePropertyId(newProp.id);
     setModalType(null);
@@ -150,7 +153,6 @@ function App() {
       <header className="header">
         <div className="logo"><Calendar size={28} /> SyncStay</div>
         
-        {/* CONTROLS - NOW VISIBLE TO EVERYONE */}
         <div className="controls-area">
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
             <Building size={16} color="#717171" />
@@ -166,7 +168,6 @@ function App() {
             </select>
           </div>
 
-          {/* ADD BUTTONS - HIDDEN FOR AGENTS */}
           {!isAgent && (
             <>
               <button className="btn-outline" onClick={() => setModalType('property')}><Plus size={14} /> Property</button>
@@ -188,8 +189,7 @@ function App() {
             </div>
           ) : (
             <div style={{ padding: '40px', textAlign: 'center', border: '2px dashed #ddd', borderRadius: '12px' }}>
-              <h3>No Data</h3>
-              <p>Please create a Property and Room.</p>
+              <h3>No Data</h3><p>Please create a Property and Room.</p>
             </div>
           )}
 
@@ -223,18 +223,13 @@ function App() {
         </main>
 
         <aside>
-          {/* BLOCK DATES - VISIBLE TO EVERYONE */}
           <div className="sidebar-card" style={{ background: '#222', color: 'white' }}>
-            <h3 className="card-title" style={{ color: 'white' }}>
-              {isAgent ? "Report Booking" : "Quick Actions"}
-            </h3>
+            <h3 className="card-title" style={{ color: 'white' }}>{isAgent ? "Report Booking" : "Quick Actions"}</h3>
             <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setModalType('block')}>
-              <Plus size={18} /> {isAgent ? "I Have a Client (Block Date)" : "Block Dates Manually"}
+              <Lock size={16} /> {isAgent ? "Block Dates (PIN Required)" : "Block Dates Manually"}
             </button>
-            {isAgent && <p style={{fontSize:'12px', marginTop:'10px', opacity:0.8}}>Sold a date? Block it here instantly.</p>}
           </div>
 
-          {/* SHARE LINK - HIDDEN FOR AGENTS */}
           {!isAgent && (
             <div className="sidebar-card">
               <h3 className="card-title">Share Calendar</h3>
@@ -244,15 +239,13 @@ function App() {
                 style={{ width: '100%', justifyContent: 'center', borderColor: copySuccess ? 'green' : '#dddddd', color: copySuccess ? 'green' : 'inherit' }}
                 onClick={handleCopyLink}
               >
-                {copySuccess ? <Check size={16} /> : <Copy size={16} />} 
-                {copySuccess ? ' Copied!' : ' Copy Link'}
+                {copySuccess ? <Check size={16} /> : <Copy size={16} />} {copySuccess ? ' Copied!' : ' Copy Link'}
               </button>
             </div>
           )}
         </aside>
       </div>
 
-      {/* --- MODALS --- */}
       {modalType && (
         <div className="modal-overlay" onClick={() => setModalType(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -260,26 +253,45 @@ function App() {
               <h3 className="modal-title">Manage</h3>
               <button className="close-btn" onClick={() => setModalType(null)}><X size={20} /></button>
             </div>
+
             {modalType === 'block' && (
               <form onSubmit={handleSaveBlock}>
                 <div className="form-group"><label className="form-label">Check-in</label><input type="date" className="form-input" required value={forms.manual.start} onChange={e => setForms({...forms, manual: {...forms.manual, start: e.target.value}})} /></div>
                 <div className="form-group"><label className="form-label">Check-out</label><input type="date" className="form-input" required value={forms.manual.end} onChange={e => setForms({...forms, manual: {...forms.manual, end: e.target.value}})} /></div>
-                <div className="form-group"><label className="form-label">Agent Name / Note</label><input type="text" className="form-input" value={forms.manual.agent} placeholder="e.g. Paid via Transfer" onChange={e => setForms({...forms, manual: {...forms.manual, agent: e.target.value}})} /></div>
-                <button type="submit" className="btn-submit">Block Now</button>
+                <div className="form-group"><label className="form-label">Agent Name</label><input type="text" className="form-input" value={forms.manual.agent} placeholder="e.g. Booking from Agent" onChange={e => setForms({...forms, manual: {...forms.manual, agent: e.target.value}})} /></div>
+                
+                {/* PIN FIELD */}
+                <div className="form-group" style={{background: '#f8f8f8', padding: '10px', borderRadius: '8px'}}>
+                  <label className="form-label">Security PIN <span style={{color:'red'}}>*</span></label>
+                  <input type="password" className="form-input" required placeholder="Enter 4-digit PIN" value={forms.manual.pin} onChange={e => setForms({...forms, manual: {...forms.manual, pin: e.target.value}})} />
+                  <small style={{fontSize:'11px', color:'#777'}}>Ask property owner for PIN.</small>
+                </div>
+                
+                <button type="submit" className="btn-submit">Verify & Block</button>
               </form>
             )}
+
             {modalType === 'property' && (
               <form onSubmit={handleSaveProperty}>
                  <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-input" required value={forms.property.name} onChange={e => setForms({...forms, property: {...forms.property, name: e.target.value}})} /></div>
                  <div className="form-group"><label className="form-label">Location</label><input type="text" className="form-input" required value={forms.property.location} onChange={e => setForms({...forms, property: {...forms.property, location: e.target.value}})} /></div>
-                 <button type="submit" className="btn-submit">Create</button>
+                 
+                 {/* PIN CREATION */}
+                 <div className="form-group" style={{background: '#eef2ff', padding: '10px', borderRadius: '8px', border:'1px solid #c7d2fe'}}>
+                    <label className="form-label" style={{color: '#3730a3'}}>Create Booking PIN</label>
+                    <input type="text" className="form-input" required placeholder="e.g. 1234" value={forms.property.pin} onChange={e => setForms({...forms, property: {...forms.property, pin: e.target.value}})} />
+                    <small style={{fontSize:'11px', color:'#3730a3'}}>Agents must use this to block dates.</small>
+                 </div>
+
+                 <button type="submit" className="btn-submit">Create Property</button>
               </form>
             )}
+
             {modalType === 'room' && (
               <form onSubmit={handleSaveRoom}>
                  <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-input" required value={forms.room.name} onChange={e => setForms({...forms, room: {...forms.room, name: e.target.value}})} /></div>
                  <div className="form-group"><label className="form-label">Price</label><input type="text" className="form-input" required value={forms.room.price} onChange={e => setForms({...forms, room: {...forms.room, price: e.target.value}})} /></div>
-                 <button type="submit" className="btn-submit">Create</button>
+                 <button type="submit" className="btn-submit">Create Room</button>
               </form>
             )}
           </div>

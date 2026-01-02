@@ -5,26 +5,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- DATA STORAGE (Resets on Server Restart) ---
-// We pre-fill this with data so the Agent view is NEVER blank for your demo.
+// --- DATA STORAGE ---
 let db = {
   properties: [
-    { id: 1, name: "Blue Water Duplex", location: "Lekki Phase 1" }
+    // Default property with a default PIN '1234'
+    { id: 1, name: "Blue Water Duplex", location: "Lekki Phase 1", pin: "1234" }
   ],
   rooms: [
-    { id: 101, propertyId: 1, name: "Whole Apartment", price: "₦200,000" },
-    { id: 102, propertyId: 1, name: "Master Bedroom", price: "₦65,000" }
+    { id: 101, propertyId: 1, name: "Whole Apartment", price: "₦200,000" }
   ],
   bookings: [
-    // Pre-filled booking so you can see it working immediately
-    { 
-      id: 999, 
-      roomId: 101, 
-      start: new Date().toISOString(), // Today
-      end: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days later
-      source: 'manual', 
-      label: 'Demo Booking' 
-    }
+    { id: 999, roomId: 101, start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString(), source: 'manual', label: 'Demo' }
   ]
 };
 
@@ -33,21 +24,36 @@ app.get('/api/data', (req, res) => {
   res.json(db);
 });
 
-// --- POST ENDPOINTS (Save Data) ---
-app.post('/api/bookings', (req, res) => {
-  const newBooking = req.body;
-  if (!newBooking.start || !newBooking.end) return res.status(400).json({ error: "Missing dates" });
-  db.bookings.push(newBooking);
-  res.json({ success: true, booking: newBooking });
-});
-
+// --- POST ENDPOINTS ---
 app.post('/api/properties', (req, res) => {
-  db.properties.push(req.body);
+  // Save the PIN when creating property
+  const newProp = req.body;
+  if (!newProp.pin) newProp.pin = "1234"; // Default pin if none provided
+  db.properties.push(newProp);
   res.json({ success: true });
 });
 
 app.post('/api/rooms', (req, res) => {
   db.rooms.push(req.body);
+  res.json({ success: true });
+});
+
+app.post('/api/bookings', (req, res) => {
+  const { pin, ...bookingData } = req.body;
+  
+  // 1. FIND THE PROPERTY FOR THIS BOOKING
+  const room = db.rooms.find(r => r.id === parseInt(bookingData.roomId));
+  if (!room) return res.status(404).json({ error: "Room not found" });
+
+  const property = db.properties.find(p => p.id === room.propertyId);
+  
+  // 2. CHECK THE PIN
+  if (property.pin !== pin) {
+    return res.status(401).json({ error: "Incorrect PIN" });
+  }
+
+  // 3. SAVE IF PIN IS CORRECT
+  db.bookings.push(bookingData);
   res.json({ success: true });
 });
 
