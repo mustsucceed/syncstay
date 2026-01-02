@@ -40,7 +40,7 @@ function App() {
     const fetchBookings = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3000/api/bookings');
+        const response = await fetch('https://syncstay.onrender.com/api/bookings');
         const data = await response.json();
         setBookings(data);
       } catch (error) { /* Ignore offline errors */ } finally { setLoading(false); }
