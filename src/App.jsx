@@ -26,12 +26,11 @@ function App() {
   const [copySuccess, setCopySuccess] = useState(false);
   const isAgent = window.location.search.includes('view=agent');
 
-  // --- 1. FETCH EVERYTHING ON LOAD ---
+  // --- FETCH DATA ---
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setLoading(true);
-        // Using your live Render URL
         const response = await fetch('https://syncstay.onrender.com/api/data');
         const data = await response.json();
         
@@ -39,9 +38,9 @@ function App() {
         setRooms(data.rooms);
         setBookings(data.bookings);
 
-        // Set Defaults
-        if (data.properties.length > 0) setActivePropertyId(data.properties[0].id);
-        if (data.rooms.length > 0) setActiveRoomId(data.rooms[0].id);
+        // Set Defaults if not set
+        if (!activePropertyId && data.properties.length > 0) setActivePropertyId(data.properties[0].id);
+        if (!activeRoomId && data.rooms.length > 0) setActiveRoomId(data.rooms[0].id);
 
       } catch (error) { 
         console.error("Fetch failed", error);
@@ -56,6 +55,16 @@ function App() {
   const activePropertyRooms = rooms.filter(r => r.propertyId === parseInt(activePropertyId));
   const activeRoom = rooms.find(r => r.id === parseInt(activeRoomId));
   const activeProperty = properties.find(p => p.id === parseInt(activePropertyId));
+
+  // Auto-select first room when property changes
+  useEffect(() => {
+    if (activePropertyId && activePropertyRooms.length > 0) {
+      // Only switch if current room doesn't belong to new property
+      const currentRoomInProp = activePropertyRooms.find(r => r.id === activeRoomId);
+      if (!currentRoomInProp) setActiveRoomId(activePropertyRooms[0].id);
+    }
+  }, [activePropertyId, activePropertyRooms]);
+
 
   // --- ACTIONS ---
 
@@ -77,15 +86,13 @@ function App() {
       start: forms.manual.start,
       end: forms.manual.end,
       source: 'manual',
-      label: forms.manual.agent || 'Manual Block'
+      label: forms.manual.agent || (isAgent ? 'Agent Booking' : 'Manual Block')
     };
 
-    // Optimistic Update (Show immediately)
     setBookings([...bookings, newBooking]);
     setModalType(null);
     setForms({ ...forms, manual: { start: '', end: '', agent: '' } });
 
-    // Send to Server
     await fetch('https://syncstay.onrender.com/api/bookings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,7 +103,6 @@ function App() {
   const handleSaveProperty = async (e) => {
     e.preventDefault();
     const newProp = { id: Date.now(), name: forms.property.name, location: forms.property.location };
-    
     setProperties([...properties, newProp]);
     setActivePropertyId(newProp.id);
     setModalType(null);
@@ -111,7 +117,6 @@ function App() {
   const handleSaveRoom = async (e) => {
     e.preventDefault();
     const newRoom = { id: Date.now(), propertyId: activePropertyId, name: forms.room.name, price: forms.room.price };
-    
     setRooms([...rooms, newRoom]);
     setActiveRoomId(newRoom.id);
     setModalType(null);
@@ -145,30 +150,34 @@ function App() {
       <header className="header">
         <div className="logo"><Calendar size={28} /> SyncStay</div>
         
-        {!isAgent && (
-          <div className="controls-area">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
-              <Building size={16} color="#717171" />
-              <select className="property-selector" value={activePropertyId || ''} onChange={(e) => setActivePropertyId(parseInt(e.target.value))}>
-                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
-              <BedDouble size={16} color="#717171" />
-              <select className="property-selector" value={activeRoomId || ''} onChange={(e) => setActiveRoomId(parseInt(e.target.value))} disabled={!activePropertyRooms.length}>
-                {activePropertyRooms.length === 0 ? <option>No Rooms</option> : activePropertyRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-            </div>
-
-            <button className="btn-outline" onClick={() => setModalType('property')}><Plus size={14} /> Property</button>
-            <button className="btn-primary" onClick={() => setModalType('room')}><Plus size={14} /> Room</button>
+        {/* CONTROLS - NOW VISIBLE TO EVERYONE */}
+        <div className="controls-area">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
+            <Building size={16} color="#717171" />
+            <select className="property-selector" value={activePropertyId || ''} onChange={(e) => setActivePropertyId(parseInt(e.target.value))}>
+              {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
-        )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
+            <BedDouble size={16} color="#717171" />
+            <select className="property-selector" value={activeRoomId || ''} onChange={(e) => setActiveRoomId(parseInt(e.target.value))} disabled={!activePropertyRooms.length}>
+              {activePropertyRooms.length === 0 ? <option>No Rooms</option> : activePropertyRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
+
+          {/* ADD BUTTONS - HIDDEN FOR AGENTS */}
+          {!isAgent && (
+            <>
+              <button className="btn-outline" onClick={() => setModalType('property')}><Plus size={14} /> Property</button>
+              <button className="btn-primary" onClick={() => setModalType('room')}><Plus size={14} /> Room</button>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="grid">
-        <main style={{ gridColumn: isAgent ? '1 / -1' : 'auto' }}>
+        <main>
           {activeRoom ? (
             <div className="property-header">
               <h1 className="property-title">{activeRoom.name}</h1>
@@ -179,8 +188,8 @@ function App() {
             </div>
           ) : (
             <div style={{ padding: '40px', textAlign: 'center', border: '2px dashed #ddd', borderRadius: '12px' }}>
-              <h3>No Data Found</h3>
-              <p>Please create a Property and Room first.</p>
+              <h3>No Data</h3>
+              <p>Please create a Property and Room.</p>
             </div>
           )}
 
@@ -213,15 +222,20 @@ function App() {
           )}
         </main>
 
-        {!isAgent && activeRoom && (
-          <aside>
-            <div className="sidebar-card" style={{ background: '#222', color: 'white' }}>
-              <h3 className="card-title" style={{ color: 'white' }}>Quick Actions</h3>
-              <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setModalType('block')}>
-                <Plus size={18} /> Block Dates
-              </button>
-            </div>
+        <aside>
+          {/* BLOCK DATES - VISIBLE TO EVERYONE */}
+          <div className="sidebar-card" style={{ background: '#222', color: 'white' }}>
+            <h3 className="card-title" style={{ color: 'white' }}>
+              {isAgent ? "Report Booking" : "Quick Actions"}
+            </h3>
+            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setModalType('block')}>
+              <Plus size={18} /> {isAgent ? "I Have a Client (Block Date)" : "Block Dates Manually"}
+            </button>
+            {isAgent && <p style={{fontSize:'12px', marginTop:'10px', opacity:0.8}}>Sold a date? Block it here instantly.</p>}
+          </div>
 
+          {/* SHARE LINK - HIDDEN FOR AGENTS */}
+          {!isAgent && (
             <div className="sidebar-card">
               <h3 className="card-title">Share Calendar</h3>
               <div className="link-box">{window.location.host}/?view=agent</div>
@@ -234,11 +248,11 @@ function App() {
                 {copySuccess ? ' Copied!' : ' Copy Link'}
               </button>
             </div>
-          </aside>
-        )}
+          )}
+        </aside>
       </div>
 
-      {/* --- MODALS (Same as before) --- */}
+      {/* --- MODALS --- */}
       {modalType && (
         <div className="modal-overlay" onClick={() => setModalType(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -246,13 +260,12 @@ function App() {
               <h3 className="modal-title">Manage</h3>
               <button className="close-btn" onClick={() => setModalType(null)}><X size={20} /></button>
             </div>
-            {/* Keeping Forms Simple for Brevity - They work as mapped above */}
             {modalType === 'block' && (
               <form onSubmit={handleSaveBlock}>
                 <div className="form-group"><label className="form-label">Check-in</label><input type="date" className="form-input" required value={forms.manual.start} onChange={e => setForms({...forms, manual: {...forms.manual, start: e.target.value}})} /></div>
                 <div className="form-group"><label className="form-label">Check-out</label><input type="date" className="form-input" required value={forms.manual.end} onChange={e => setForms({...forms, manual: {...forms.manual, end: e.target.value}})} /></div>
-                <div className="form-group"><label className="form-label">Agent</label><input type="text" className="form-input" value={forms.manual.agent} onChange={e => setForms({...forms, manual: {...forms.manual, agent: e.target.value}})} /></div>
-                <button type="submit" className="btn-submit">Save</button>
+                <div className="form-group"><label className="form-label">Agent Name / Note</label><input type="text" className="form-input" value={forms.manual.agent} placeholder="e.g. Paid via Transfer" onChange={e => setForms({...forms, manual: {...forms.manual, agent: e.target.value}})} /></div>
+                <button type="submit" className="btn-submit">Block Now</button>
               </form>
             )}
             {modalType === 'property' && (
