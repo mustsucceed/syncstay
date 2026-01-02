@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary: #ff385c;
+  --primary-hover: #d90b3e;
+  --dark: #222222;
+  --gray: #717171;
+  --light-gray: #f7f7f7;
+  --border: #dddddd;
+  --success: #008a05;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+
+body { background-color: #fff; color: var(--dark); font-size: 14px; }
+
+/* LAYOUT */
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+/* HEADER */
+.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+.logo { font-size: 24px; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+
+.controls-area { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* SELECTORS */
+.property-selector {
+  padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+  font-size: 14px; font-weight: 600; color: var(--dark);
+  background-color: white; cursor: pointer; min-width: 140px;
+}
+
+/* BUTTONS */
+.btn-primary { 
+  background: var(--primary); color: white; border: none; padding: 10px 16px; 
+  border-radius: 8px; font-weight: 600; cursor: pointer; 
+  display: flex; align-items: center; gap: 6px; font-size: 14px; transition: 0.2s; 
+  white-space: nowrap;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+
+.btn-outline { 
+  background: white; color: var(--dark); border: 1px solid var(--border); 
+  padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; 
+  display: flex; align-items: center; gap: 6px; font-size: 14px; transition: 0.2s; 
+  white-space: nowrap;
+}
+.btn-outline:hover { background: var(--light-gray); border-color: var(--dark); }
+
+/* DASHBOARD GRID */
+.grid { display: grid; grid-template-columns: 1fr 340px; gap: 40px; align-items: start; }
+
+/* CALENDAR */
+.property-header { margin-bottom: 20px; }
+.property-title { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.property-meta { color: var(--gray); font-size: 14px; display: flex; gap: 16px; flex-wrap: wrap; }
+
+.calendar-container { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 6px 16px rgba(0,0,0,0.05); }
+.month-header { background: white; padding: 16px; text-align: center; font-weight: 700; font-size: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.nav-btn { background: none; border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+.days-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; border-bottom: 1px solid var(--border); background: var(--light-gray); }
+.day-label { padding: 10px 4px; font-size: 11px; font-weight: 600; color: var(--gray); text-transform: uppercase; }
+
+.dates-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: white; }
+.date-cell { min-height: 90px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 6px; position: relative; }
+.date-number { font-size: 13px; font-weight: 500; margin-bottom: 4px; display: block; }
+.today { background-color: #fff0f3; }
+.today .date-number { color: var(--primary); font-weight: 700; }
+
+.booking-pill { font-size: 10px; padding: 3px 6px; border-radius: 4px; margin-top: 2px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-airbnb { background: #ffebeb; color: #c13515; }
+.source-booking { background: #ebf3ff; color: #003580; }
+.source-manual { background: #f0fdf4; color: #166534; }
+
+/* SIDEBAR */
+.sidebar-card { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.card-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+.link-box { background: var(--light-gray); padding: 10px; border-radius: 6px; font-size: 12px; color: var(--dark); word-break: break-all; margin-bottom: 12px; border: 1px solid var(--border); font-family: monospace; }
+
+/* MODAL */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; backdrop-filter: blur(2px); }
+.modal-content { background: white; padding: 24px; border-radius: 16px; width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); animation: slideUp 0.2s ease-out; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-title { font-size: 18px; font-weight: 700; }
+.close-btn { background: #f1f1f1; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #666; transition: 0.2s; }
+.close-btn:hover { background: #e0e0e0; color: #000; }
+
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #444; }
+.form-input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; outline: none; transition: 0.2s; }
+.form-input:focus { border-color: var(--dark); box-shadow: 0 0 0 3px rgba(0,0,0,0.05); }
+
+.modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+.btn-cancel { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1; }
+.btn-submit { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1; }
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 850px) {
+  .header { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .controls-area { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .property-selector { width: 100%; grid-column: span 2; }
+  .btn-primary, .btn-outline { width: 100%; justify-content: center; }
+  
+  /* Stack the grid so sidebar is below calendar */
+  .grid { grid-template-columns: 1fr; gap: 30px; }
+  
+  .dates-grid .date-cell { min-height: 70px; }
+  .date-number { font-size: 12px; }
+  .booking-pill { font-size: 9px; padding: 2px 4px; }
+  
+  .modal-content { padding: 20px; }
+}
