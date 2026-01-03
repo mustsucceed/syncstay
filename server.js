@@ -1,19 +1,26 @@
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import 'dotenv/config'; // Loads the .env file
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- CONNECT TO MONGODB (Long Term Memory) ---
-const MONGO_URI = "mongodb+srv://abdulsalamelearning_db_user:JeTk52QTnO00iQxl@cluster0.80blg27.mongodb.net/syncstay?retryWrites=true&w=majority&appName=Cluster0";
+// --- 1. SECURE DATABASE CONNECTION ---
+const MONGO_URI = process.env.MONGO_URI; 
+
+// Safety Check: Did you forget the .env file?
+if (!MONGO_URI) {
+  console.error("FATAL ERROR: MONGO_URI is missing. Check your .env file or Render Environment Variables.");
+  process.exit(1);
+}
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log("Connected to MongoDB Database"))
   .catch(err => console.error("MongoDB Connection Error:", err));
 
-// --- SCHEMAS (The Shape of your Data) ---
+// --- 2. SCHEMAS (Data Shape) ---
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true }
@@ -40,13 +47,13 @@ const BookingSchema = new mongoose.Schema({
   label: String
 });
 
-// --- MODELS ---
+// --- 3. MODELS ---
 const User = mongoose.model('User', UserSchema);
 const Property = mongoose.model('Property', PropertySchema);
 const Room = mongoose.model('Room', RoomSchema);
 const Booking = mongoose.model('Booking', BookingSchema);
 
-// --- AUTH ENDPOINTS ---
+// --- 4. AUTH ENDPOINTS ---
 app.post('/api/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -54,7 +61,6 @@ app.post('/api/signup', async (req, res) => {
     if (existing) return res.status(400).json({ error: "User already exists" });
 
     const newUser = await User.create({ username, password });
-    // Send back 'id' instead of '_id' for frontend compatibility
     res.json({ success: true, user: { id: newUser._id.toString(), username: newUser.username } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -71,7 +77,7 @@ app.post('/api/login', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- DATA ENDPOINTS ---
+// --- 5. DATA ENDPOINTS ---
 app.get('/api/data', async (req, res) => {
   try {
     const { userId } = req.query;
@@ -79,15 +85,15 @@ app.get('/api/data', async (req, res) => {
     // Get Properties for this user
     const properties = await Property.find({ userId });
     
-    // Get Rooms for these properties
+    // Get Rooms belonging to those properties
     const propIds = properties.map(p => p._id.toString());
     const rooms = await Room.find({ propertyId: { $in: propIds } });
     
-    // Get Bookings for these rooms
+    // Get Bookings belonging to those rooms
     const roomIds = rooms.map(r => r._id.toString());
     const bookings = await Booking.find({ roomId: { $in: roomIds } });
 
-    // Convert _id to id for frontend
+    // Helper to format IDs nicely for frontend
     const mapId = (items) => items.map(item => ({ ...item.toObject(), id: item._id.toString() }));
 
     res.json({
@@ -98,7 +104,7 @@ app.get('/api/data', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- CREATE ENDPOINTS ---
+// --- 6. CREATE ENDPOINTS ---
 app.post('/api/properties', async (req, res) => {
   try {
     await Property.create(req.body);
@@ -117,7 +123,7 @@ app.post('/api/bookings', async (req, res) => {
   try {
     const { pin, ...bookingData } = req.body;
     
-    // Verify PIN
+    // Security Check: Verify PIN
     const room = await Room.findById(bookingData.roomId);
     if (!room) return res.status(404).json({ error: "Room not found" });
     
@@ -129,7 +135,7 @@ app.post('/api/bookings', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- DELETE ---
+// --- 7. DELETE ENDPOINT ---
 app.delete('/api/properties/:id', async (req, res) => {
   try {
     const { pin } = req.body;
@@ -142,7 +148,7 @@ app.delete('/api/properties/:id', async (req, res) => {
     // Delete property
     await Property.findByIdAndDelete(id);
     
-    // Cleanup rooms and bookings
+    // Cleanup: Delete related rooms and bookings
     const rooms = await Room.find({ propertyId: id });
     const roomIds = rooms.map(r => r._id);
     await Room.deleteMany({ propertyId: id });
