@@ -31,9 +31,11 @@ function App() {
 
   const [copySuccess, setCopySuccess] = useState(false);
   
+  // --- URL PARAMS (Agent & Secret Admin) ---
   const searchParams = new URLSearchParams(window.location.search);
   const isAgent = searchParams.get('view') === 'agent';
   const agentUid = searchParams.get('uid'); 
+  const allowSignup = searchParams.get('secret') === 'money'; // SECRET KEY
 
   // --- INITIAL LOAD ---
   useEffect(() => {
@@ -91,7 +93,7 @@ function App() {
     } catch (error) { console.error("Failed to fetch"); } finally { setLoading(false); }
   };
 
-  // --- FILTERING (REMOVED PARSEINT) ---
+  // --- FILTERING ---
   const activePropertyRooms = rooms.filter(r => r.propertyId === activePropertyId);
   const activeRoom = rooms.find(r => r.id === activeRoomId);
   const activeProperty = properties.find(p => p.id === activePropertyId);
@@ -113,11 +115,11 @@ function App() {
   const handleSaveBlock = async (e) => {
     e.preventDefault();
     if (!forms.manual.pin) return alert("Enter PIN");
-    // Don't use Date.now() for ID here, let Mongo handle it, but for UI optimism we use it temp
+    
+    // Optimistic ID (temp)
     const tempId = Date.now().toString();
     const newBooking = { id: tempId, roomId: activeRoomId, start: forms.manual.start, end: forms.manual.end, source: 'manual', label: forms.manual.agent || (isAgent ? 'Agent Booking' : 'Manual Block') };
     
-    // Optimistic Update
     setBookings([...bookings, newBooking]); 
     setModalType(null); 
     setForms({...forms, manual: {start:'', end:'', agent:'', pin:''}}); 
@@ -125,8 +127,7 @@ function App() {
     const response = await fetch('https://syncstay.onrender.com/api/bookings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ ...newBooking, pin: forms.manual.pin }) });
     if (!response.ok) { 
         alert("Incorrect PIN"); 
-        // Revert if failed
-        setBookings(bookings.filter(b => b.id !== tempId));
+        setBookings(bookings.filter(b => b.id !== tempId)); // Revert if failed
     }
   };
 
@@ -137,7 +138,7 @@ function App() {
     
     await fetch('https://syncstay.onrender.com/api/properties', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(newProp) });
     setModalType(null);
-    fetchUserData(user.id); // Refresh to get real Mongo ID
+    fetchUserData(user.id); 
   };
 
   const handleSaveRoom = async (e) => {
@@ -163,25 +164,34 @@ function App() {
   
   const getBookingForDay = (day) => { if (!activeRoomId) return null; return bookings.find(booking => { if (booking.roomId !== activeRoomId) return false; const start = typeof booking.start === 'string' ? parseISO(booking.start.substring(0, 10)) : new Date(booking.start); const end = typeof booking.end === 'string' ? parseISO(booking.end.substring(0, 10)) : new Date(booking.end); return isWithinInterval(day, { start, end }); }); };
 
-  // --- RENDER ---
+  // --- RENDER: LOGIN SCREEN (With Secret Guard) ---
   if (!user && !isAgent) {
     return (
       <div className="login-wrapper">
         <div className="login-card">
           <div className="brand-header"><Calendar size={40} strokeWidth={2.5} color="#ff385c" /><span className="brand-name">SyncStay</span></div>
-          <h2 className="login-title">{authMode === 'login' ? 'Welcome Back' : 'Get Started'}</h2>
-          <p className="login-subtitle">{authMode === 'login' ? 'Login to manage your properties' : 'Create an account to start syncing'}</p>
+          
+          <h2 className="login-title">{authMode === 'login' ? 'Welcome Back' : 'Create Admin Account'}</h2>
+          <p className="login-subtitle">{authMode === 'login' ? 'Login to manage your properties' : 'Enter details for the new client'}</p>
+          
           <form onSubmit={handleAuth}>
             <input className="login-input" placeholder="Username" required value={authForm.username} onChange={e => setAuthForm({...authForm, username: e.target.value})} />
             <input className="login-input" type="password" placeholder="Password" required value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
             <button className="login-btn">{authMode === 'login' ? 'Log In' : 'Create Account'}</button>
           </form>
-          <div className="auth-switch" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? "New here? Create an account" : "Already have an account? Log In"}</div>
+
+          {/* HIDDEN SIGNUP SWITCH: Only shows if URL has ?secret=money */}
+          {allowSignup && (
+            <div className="auth-switch" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+               {authMode === 'login' ? "Admin Mode: Create New Account" : "Back to Login"}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
+  // --- RENDER: DASHBOARD ---
   return (
     <div className="container">
       <header className="header">
@@ -278,7 +288,6 @@ function App() {
               <h3 className="modal-title">{modalType === 'delete' ? 'Delete Property' : 'Manage'}</h3>
               <button className="close-btn" onClick={() => setModalType(null)}><X size={20} /></button>
             </div>
-            {/* Same forms as before, just ensured values are correct */}
             {modalType === 'delete' && (<form onSubmit={handleDeleteProperty}><p style={{marginBottom:'15px', color:'red'}}>Warning: This will delete <strong>{activeProperty?.name}</strong>.</p><div className="form-group" style={{background: '#fff0f0', padding: '10px', borderRadius: '8px', border:'1px solid #fed7d7'}}><label className="form-label" style={{color:'#c53030'}}>Enter PIN to Confirm</label><input type="password" className="form-input" required placeholder="PIN" value={forms.delete.pin} onChange={e => setForms({...forms, delete: {pin: e.target.value}})} /></div><button type="submit" className="btn-submit" style={{background:'#e53e3e'}}>Delete Forever</button></form>)}
             {modalType === 'block' && (<form onSubmit={handleSaveBlock}><div className="form-group"><label className="form-label">Check-in</label><input type="date" className="form-input" required value={forms.manual.start} onChange={e => setForms({...forms, manual: {...forms.manual, start: e.target.value}})} /></div><div className="form-group"><label className="form-label">Check-out</label><input type="date" className="form-input" required value={forms.manual.end} onChange={e => setForms({...forms, manual: {...forms.manual, end: e.target.value}})} /></div><div className="form-group"><label className="form-label">Agent Name</label><input type="text" className="form-input" value={forms.manual.agent} placeholder="e.g. Booking from Agent" onChange={e => setForms({...forms, manual: {...forms.manual, agent: e.target.value}})} /></div><div className="form-group" style={{background: '#f8f8f8', padding: '10px', borderRadius: '8px'}}><label className="form-label">Security PIN <span style={{color:'red'}}>*</span></label><input type="password" className="form-input" required placeholder="Enter 4-digit PIN" value={forms.manual.pin} onChange={e => setForms({...forms, manual: {...forms.manual, pin: e.target.value}})} /></div><button type="submit" className="btn-submit">Verify & Block</button></form>)}
             {modalType === 'property' && (<form onSubmit={handleSaveProperty}><div className="form-group"><label className="form-label">Name</label><input type="text" className="form-input" required value={forms.property.name} onChange={e => setForms({...forms, property: {...forms.property, name: e.target.value}})} /></div><div className="form-group"><label className="form-label">Location</label><input type="text" className="form-input" required value={forms.property.location} onChange={e => setForms({...forms, property: {...forms.property, location: e.target.value}})} /></div><div className="form-group" style={{background: '#eef2ff', padding: '10px', borderRadius: '8px', border:'1px solid #c7d2fe'}}><label className="form-label" style={{color: '#3730a3'}}>Create Booking PIN</label><input type="text" className="form-input" required placeholder="e.g. 1234" value={forms.property.pin} onChange={e => setForms({...forms, property: {...forms.property, pin: e.target.value}})} /></div><button type="submit" className="btn-submit">Create Property</button></form>)}
