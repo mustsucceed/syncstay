@@ -109,7 +109,7 @@ app.delete('/api/properties/:id', async (req, res) => {
 });
 
 // --- 6. CATCH-ALL ROUTE (The Fix) ---
-// We use a Regex /.*/ here because the symbol '*' causes errors in newer Node versions
+// We use a Regex /.*/ here to fix the crash
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
