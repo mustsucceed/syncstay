@@ -1,95 +1,155 @@
 import express from 'express';
 import cors from 'cors';
+import mongoose from 'mongoose';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- DATABASE ---
-let db = {
-  users: [], // Stores { id, username, password }
-  properties: [],
-  rooms: [],
-  bookings: []
-};
+// --- CONNECT TO MONGODB (Long Term Memory) ---
+const MONGO_URI = "mongodb+srv://abdulsalamelearning_db_user:JeTk52QTnO00iQxl@cluster0.80blg27.mongodb.net/syncstay?retryWrites=true&w=majority&appName=Cluster0";
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("Connected to MongoDB Database"))
+  .catch(err => console.error("MongoDB Connection Error:", err));
+
+// --- SCHEMAS (The Shape of your Data) ---
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true }
+});
+
+const PropertySchema = new mongoose.Schema({
+  userId: String,
+  name: String,
+  location: String,
+  pin: String
+});
+
+const RoomSchema = new mongoose.Schema({
+  propertyId: String,
+  name: String,
+  price: String
+});
+
+const BookingSchema = new mongoose.Schema({
+  roomId: String,
+  start: String,
+  end: String,
+  source: String,
+  label: String
+});
+
+// --- MODELS ---
+const User = mongoose.model('User', UserSchema);
+const Property = mongoose.model('Property', PropertySchema);
+const Room = mongoose.model('Room', RoomSchema);
+const Booking = mongoose.model('Booking', BookingSchema);
 
 // --- AUTH ENDPOINTS ---
-app.post('/api/signup', (req, res) => {
-  const { username, password } = req.body;
-  if (db.users.find(u => u.username === username)) {
-    return res.status(400).json({ error: "User already exists" });
-  }
-  const newUser = { id: Date.now(), username, password };
-  db.users.push(newUser);
-  res.json({ success: true, user: newUser });
+app.post('/api/signup', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const existing = await User.findOne({ username });
+    if (existing) return res.status(400).json({ error: "User already exists" });
+
+    const newUser = await User.create({ username, password });
+    // Send back 'id' instead of '_id' for frontend compatibility
+    res.json({ success: true, user: { id: newUser._id.toString(), username: newUser.username } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = db.users.find(u => u.username === username && u.password === password);
-  
-  if (user) {
-    res.json({ success: true, user });
-  } else {
-    res.status(401).json({ error: "Invalid credentials" });
-  }
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username, password });
+    if (user) {
+      res.json({ success: true, user: { id: user._id.toString(), username: user.username } });
+    } else {
+      res.status(401).json({ error: "Invalid credentials" });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- DATA ENDPOINTS (Now Filtered by User) ---
-app.get('/api/data', (req, res) => {
-  const userId = parseInt(req.query.userId); // Who is asking?
-  
-  // Filter: Only send data belonging to this user
-  const userProps = db.properties.filter(p => p.userId === userId);
-  const propIds = userProps.map(p => p.id);
-  const userRooms = db.rooms.filter(r => propIds.includes(r.propertyId));
-  const roomIds = userRooms.map(r => r.id);
-  const userBookings = db.bookings.filter(b => roomIds.includes(b.roomId));
+// --- DATA ENDPOINTS ---
+app.get('/api/data', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    // Get Properties for this user
+    const properties = await Property.find({ userId });
+    
+    // Get Rooms for these properties
+    const propIds = properties.map(p => p._id.toString());
+    const rooms = await Room.find({ propertyId: { $in: propIds } });
+    
+    // Get Bookings for these rooms
+    const roomIds = rooms.map(r => r._id.toString());
+    const bookings = await Booking.find({ roomId: { $in: roomIds } });
 
-  res.json({
-    properties: userProps,
-    rooms: userRooms,
-    bookings: userBookings
-  });
+    // Convert _id to id for frontend
+    const mapId = (items) => items.map(item => ({ ...item.toObject(), id: item._id.toString() }));
+
+    res.json({
+      properties: mapId(properties),
+      rooms: mapId(rooms),
+      bookings: mapId(bookings)
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- CREATE ENDPOINTS (Attach User ID) ---
-app.post('/api/properties', (req, res) => {
-  const { userId, ...propData } = req.body;
-  const newProp = { ...propData, userId }; 
-  db.properties.push(newProp);
-  res.json({ success: true });
+// --- CREATE ENDPOINTS ---
+app.post('/api/properties', async (req, res) => {
+  try {
+    await Property.create(req.body);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/rooms', (req, res) => {
-  db.rooms.push(req.body);
-  res.json({ success: true });
+app.post('/api/rooms', async (req, res) => {
+  try {
+    await Room.create(req.body);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/bookings', (req, res) => {
-  const { pin, ...bookingData } = req.body;
-  
-  // Verify PIN
-  const room = db.rooms.find(r => r.id === parseInt(bookingData.roomId));
-  if (!room) return res.status(404).json({ error: "Room not found" });
-  
-  const property = db.properties.find(p => p.id === room.propertyId);
-  if (property.pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
+app.post('/api/bookings', async (req, res) => {
+  try {
+    const { pin, ...bookingData } = req.body;
+    
+    // Verify PIN
+    const room = await Room.findById(bookingData.roomId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    
+    const property = await Property.findById(room.propertyId);
+    if (property.pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
 
-  db.bookings.push(bookingData);
-  res.json({ success: true });
+    await Booking.create(bookingData);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/properties/:id', (req, res) => {
-  const { pin } = req.body;
-  const id = parseInt(req.params.id);
-  const propIndex = db.properties.findIndex(p => p.id === id);
-  
-  if (propIndex === -1) return res.status(404).json({ error: "Not found" });
-  if (db.properties[propIndex].pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
+// --- DELETE ---
+app.delete('/api/properties/:id', async (req, res) => {
+  try {
+    const { pin } = req.body;
+    const { id } = req.params;
 
-  db.properties.splice(propIndex, 1);
-  res.json({ success: true });
+    const property = await Property.findById(id);
+    if (!property) return res.status(404).json({ error: "Not found" });
+    if (property.pin !== pin) return res.status(401).json({ error: "Incorrect PIN" });
+
+    // Delete property
+    await Property.findByIdAndDelete(id);
+    
+    // Cleanup rooms and bookings
+    const rooms = await Room.find({ propertyId: id });
+    const roomIds = rooms.map(r => r._id);
+    await Room.deleteMany({ propertyId: id });
+    await Booking.deleteMany({ roomId: { $in: roomIds } });
+
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = 3000;
